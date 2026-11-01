@@ -1,0 +1,18 @@
+
+<!DOCTYPE html> 
+<html lang="ru">
+    <head>
+        <meta charset="URF-8">
+        <title>Книга рецептов</title>
+    </head>
+    <body>
+        <h1>Книга рецептов</h1>
+        <form method="post">
+            {%csrf_token%}
+            {{form.as_p}}
+            <button type="submit">Добавить</button>
+
+        </form>
+    </body>
+
+</html>
