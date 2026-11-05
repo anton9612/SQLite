@@ -7,7 +7,7 @@
     </head>
     <body>
         <h1>Создать файл</h1>
-        <form method="post">
+        <form method="post" action="{% url 'index' %}">
             {%csrf_token%}
             {{form.as_p}}
             <button type="submit">Добавить</button>
@@ -32,12 +32,23 @@
     </form>
 
 
-
+    {%if selected_type == "db"%}
+    <h2>Все сохранённые DB-рецепты</h2>
+    {%else%}
     <h2>Все сохранённые XML-рецепты</h2>
+    {% endif %}
+
+    {% if selected_type == "db" %}
+    <input
+        type="text"
+        id="recipe-search"
+        placeholder="Поиск рецептов..."
+    >
+    {% endif %}
 
     {% if xml_recipes %}
         {% for item in xml_recipes %}
-            <div>
+            <div id="recipes-list">
                 <h3>{{ item.title }}</h3>
 
                 <p>Кухня: {{ item.cuisine }}</p>
@@ -49,11 +60,23 @@
 
                 <h4>Приготовление</h4>
                 <p>{{ item.instructions|linebreaksbr }}</p>
-            </dvi>
+
+                {% if selected_type == "db"%}
+                <form method="GET" action="{% url 'recipe_edit' item.id %}">
+                    {% csrf_token %}
+                    <button>Редактировать</button>
+                </form>
+                <form method="POST" action="{% url 'recipe_delete' item.id %}">
+                    {% csrf_token %}
+                    <button>Удалить</button>
+                </form>
+                {% endif %}
+
+            </div>
             <hr>
         {% endfor %}
     {% else %}
-        <p>Пока сохранённых XML-рецептов нет.</p>
+        <p>Пока сохранённых рецептов нет.</p>
     {% endif %}
 
     </body>

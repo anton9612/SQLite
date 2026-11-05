@@ -1,8 +1,11 @@
 from django.shortcuts import render, redirect
-from .forms import RecipeForm, XmlUploadForm, RecipeShowForm
+from .forms import RecipeForm, XmlUploadForm, RecipeShowForm, RecipeEditForm
 import xml.etree.ElementTree as ET
 from django.conf import settings
 from .models import Recipe
+from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse
+from django.db.models import Q
 
 def read_xml(file_path):
     tree=ET.parse(file_path)
@@ -117,6 +120,11 @@ def xml_upload(request):
     return render(request, "main/index.html", context)
 
 def save_bd(recipe):
+    if Recipe.objects.filter(
+        title=recipe["title"],
+        cuisine=recipe["cuisine"]
+    ).exists():
+        raise ValueError("Этот рецепт уже существует")
     new_recipe = Recipe(
         title=recipe["title"],
         cuisine=recipe["cuisine"],
@@ -128,13 +136,15 @@ def save_bd(recipe):
     new_recipe.save()
 
 def show_recipes(request):
-
+    selected_type=None
+    xml_recipes = []
     if request.method=="GET":
         recipe_type=RecipeShowForm(request.GET)
         if recipe_type.is_valid():
+            selected_type=recipe_type.cleaned_data["source"]
             recipe_type=recipe_type.cleaned_data
-            if recipe_type["source"]=="xml":
-                xml_recipes = []
+            if selected_type=="xml":
+
                 data_dir = settings.BASE_DIR / "recipes_data"
                 recipes_file = data_dir / "recipes.xml"
                 if recipes_file.exists():
@@ -147,7 +157,7 @@ def show_recipes(request):
                             saved_recipe[child.tag] = child.text or ""
                         saved_recipe["filename"] = recipes_file.name
                         xml_recipes.append(saved_recipe)
-            elif recipe_type["source"]=="db":
+            elif selected_type=="db":
                 xml_recipes=Recipe.objects.all().values()
     source_form=RecipeShowForm(
         data=request.GET or None,
@@ -160,9 +170,58 @@ def show_recipes(request):
         "xml_recipes": xml_recipes,
         "upload_form": XmlUploadForm(),
         "source_form":source_form,
+        "selected_type":selected_type,
     }
     return render(request, "main/index.html", context)
 
+def recipe_edit(request, recipe_id):
+
+    recipe=Recipe.objects.filter(id=recipe_id).first()
+    if request.method=="POST":
+        form=RecipeEditForm(request.POST)
+        if form.is_valid():
+            recipe.title = form.cleaned_data["title"]
+            recipe.cuisine = form.cleaned_data["cuisine"]
+            recipe.cooking_time = form.cleaned_data["cooking_time"]
+            recipe.servings = form.cleaned_data["servings"]
+            recipe.ingredients = form.cleaned_data["ingredients"]
+            recipe.instructions = form.cleaned_data["instructions"]
+            recipe.save()
+            return redirect("index")
+    else:
+        form = RecipeEditForm(instance=recipe)
+
+        return render(request, "main/recipe_edit.html",{
+            "form":form
+    })
+
+
+def recipe_delete(request, recipe_id):
+    if request.method == "POST":
+        recipe = Recipe.objects.filter(id=recipe_id).first()
+        if recipe:
+            recipe.delete()
+    return redirect("index")
+
+def recipe_search(request):
+    query = request.GET.get("q", "")
+
+    recipes = Recipe.objects.filter(
+        Q(title__icontains=query) |
+        Q(cuisine__icontains=query) |
+        Q(ingredients__icontains=query) |
+        Q(instructions__icontains=query)
+    ).values(
+        "id",
+        "title",
+        "cuisine",
+        "cooking_time",
+        "servings",
+        "ingredients",
+        "instructions"
+    )
+
+    return JsonResponse(list(recipes), safe=False)
 
 def recipe_create(request):
     upload_form = XmlUploadForm()
@@ -173,18 +232,31 @@ def recipe_create(request):
     saved_recipe=None
     recipe=None
     xml_filename=None
-
+    form=RecipeForm()
     if request.method=="POST":
+        print("Запрос дошёл до recipe_create!")
         form=RecipeForm(request.POST)
         if form.is_valid():
+            print("Форма прошла проверку!")
             recipe=form.cleaned_data.copy()
             save_to=recipe.pop("save_to")
+            print("Выбран способ сохранения:", save_to)
             if save_to=="xml":
                 xml_filename=save_xml(recipe)
                 return redirect("index")
             elif save_to=="db":
-                save_bd(recipe)
-                return redirect("index")
+                try:
+                    save_bd(recipe)
+                except (ValueError) as error:
+                    form.add_error(
+                    "title",
+                    f"Файл не прошёл проверку: {error}")
+                else:
+                    return redirect("index")
+        else:
+            print("Ошибки формы:", form.errors)
+
+
 
     if request.method=="GET":
         form=RecipeForm()
@@ -194,7 +266,7 @@ def recipe_create(request):
     xml_recipes = []
 
     context = {
-        "form": RecipeForm(),
+        "form": form,
         "recipe": None,
         "xml_filename": None,
         "xml_recipes": None,

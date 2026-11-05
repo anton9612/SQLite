@@ -1,5 +1,5 @@
 from django import forms
-
+from .models import Recipe
 
 class RecipeForm(forms.Form):
     title = forms.CharField(label="Название блюда", max_length=100
@@ -59,3 +59,19 @@ class RecipeShowForm(forms.Form):
             ("db","База данных")
         ]
     )
+
+class RecipeEditForm(forms.ModelForm):
+    class Meta:
+        model=Recipe
+        fields=[
+            "title",
+            "cuisine",
+            "cooking_time",
+            "servings",
+            "ingredients",
+            "instructions"
+        ]
+        widgets = {
+            "ingredients": forms.Textarea(attrs={"rows": 5}),
+            "instructions": forms.Textarea(attrs={"rows": 7})
+        }
