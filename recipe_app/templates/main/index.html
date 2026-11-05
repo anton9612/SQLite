@@ -26,11 +26,18 @@
     </form>
 <br><br><br><br><br><br><br><br><br><br><br><br><br><br><br><br>
         
+    <form method="get" action="{% url 'show_recipes' %}">
+        {{source_form.as_p}}
+        <button type="submit">Показать рецепты</button>
+    </form>
+
+
+
     <h2>Все сохранённые XML-рецепты</h2>
 
     {% if xml_recipes %}
         {% for item in xml_recipes %}
-            <section>
+            <div>
                 <h3>{{ item.title }}</h3>
 
                 <p>Кухня: {{ item.cuisine }}</p>
@@ -42,9 +49,7 @@
 
                 <h4>Приготовление</h4>
                 <p>{{ item.instructions|linebreaksbr }}</p>
-                
-                <small>Файл: {{ item.filename }}</small>
-            </section>
+            </dvi>
             <hr>
         {% endfor %}
     {% else %}

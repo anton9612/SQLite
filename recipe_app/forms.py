@@ -34,10 +34,28 @@ class RecipeForm(forms.Form):
         help_text="Опиши этапы приготовления по порядку."
     )
 
+    save_to = forms.ChoiceField(
+        label="Куда сохранить рецепт?",
+        choices=[
+            ("xml", "XML-файл"),
+            ("db","База данных"),
+        ]
+    )
+
+
 class XmlUploadForm(forms.Form):
     xml_file=forms.FileField(label="Выберите Файл")
     def clean_xml_file(self):
         upoaded_file=self.cleaned_data["xml_file"]
         if not upoaded_file.name.lower().endswith(".xml"):
-            raise forms.ValidationError("Ошибка! Можно загружать только xml файлы")
+            raise forms.ValidationError("Можно загружать только xml файлы")
         return upoaded_file
+
+class RecipeShowForm(forms.Form):
+    source=forms.ChoiceField(
+        label="Откуда показать рецепты?",
+        choices=[
+            ("xml","XML-файлы"),
+            ("db","База данных")
+        ]
+    )

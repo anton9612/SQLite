@@ -1,7 +1,8 @@
 from django.shortcuts import render, redirect
-from .forms import RecipeForm, XmlUploadForm
+from .forms import RecipeForm, XmlUploadForm, RecipeShowForm
 import xml.etree.ElementTree as ET
 from django.conf import settings
+from .models import Recipe
 
 def read_xml(file_path):
     tree=ET.parse(file_path)
@@ -10,8 +11,6 @@ def read_xml(file_path):
     for child in root:
         recipe_data[child.tag]=child.text or ""
     return recipe_data
-
-
 
 def save_xml(recipe):
     data_dir=settings.BASE_DIR/"recipes_data"
@@ -101,65 +100,105 @@ def xml_upload(request):
     recipes_file = data_dir / "recipes.xml"
     xml_recipes = []
 
-    if recipes_file.exists():
-        tree = ET.parse(recipes_file)
-        root = tree.getroot()
-        for recipe_element in root:
-            saved_recipe = {}
-
-            for child in recipe_element:
-                saved_recipe[child.tag] = child.text or ""
-
-            saved_recipe["filename"] = recipes_file.name
-            xml_recipes.append(saved_recipe)
-
+    xml_recipes=[]
+    source_form=RecipeShowForm(
+        data=request.GET or None,
+        initial={"source": "xml"},
+    )
     context = {
         "form": RecipeForm(),
         "recipe": None,
         "xml_filename": None,
         "xml_recipes": xml_recipes,
         "upload_form": upload_form,
+        "source_form":source_form,
     }
 
     return render(request, "main/index.html", context)
 
+def save_bd(recipe):
+    new_recipe = Recipe(
+        title=recipe["title"],
+        cuisine=recipe["cuisine"],
+        cooking_time=recipe["cooking_time"],
+        servings=recipe["servings"],
+        ingredients=recipe["ingredients"],
+        instructions=recipe["instructions"]
+    )
+    new_recipe.save()
 
+def show_recipes(request):
+
+    if request.method=="GET":
+        recipe_type=RecipeShowForm(request.GET)
+        if recipe_type.is_valid():
+            recipe_type=recipe_type.cleaned_data
+            if recipe_type["source"]=="xml":
+                xml_recipes = []
+                data_dir = settings.BASE_DIR / "recipes_data"
+                recipes_file = data_dir / "recipes.xml"
+                if recipes_file.exists():
+                    tree = ET.parse(recipes_file)
+                    root = tree.getroot()
+                    for recipe_element in root:
+                        saved_recipe = {}
+
+                        for child in recipe_element:
+                            saved_recipe[child.tag] = child.text or ""
+                        saved_recipe["filename"] = recipes_file.name
+                        xml_recipes.append(saved_recipe)
+            elif recipe_type["source"]=="db":
+                xml_recipes=Recipe.objects.all().values()
+    source_form=RecipeShowForm(
+        data=request.GET or None,
+        initial={"source": "xml"},
+    )
+    context = {
+        "form": RecipeForm(),
+        "recipe": None,
+        "xml_filename": None,
+        "xml_recipes": xml_recipes,
+        "upload_form": XmlUploadForm(),
+        "source_form":source_form,
+    }
+    return render(request, "main/index.html", context)
 
 
 def recipe_create(request):
     upload_form = XmlUploadForm()
+    source_form=RecipeShowForm(
+        data=request.GET or None,
+        initial={"source": "xml"},
+    )
     saved_recipe=None
     recipe=None
     xml_filename=None
+
     if request.method=="POST":
         form=RecipeForm(request.POST)
         if form.is_valid():
-            recipe=form.cleaned_data
-            xml_filename=save_xml(recipe)
-            return redirect("index")
+            recipe=form.cleaned_data.copy()
+            save_to=recipe.pop("save_to")
+            if save_to=="xml":
+                xml_filename=save_xml(recipe)
+                return redirect("index")
+            elif save_to=="db":
+                save_bd(recipe)
+                return redirect("index")
+
     if request.method=="GET":
         form=RecipeForm()
 
     data_dir = settings.BASE_DIR / "recipes_data"
     recipes_file = data_dir / "recipes.xml"
     xml_recipes = []
-    if recipes_file.exists():
-        tree = ET.parse(recipes_file)
-        root = tree.getroot()
-        for recipe_element in root:
-            saved_recipe = {}
-
-            for child in recipe_element:
-                saved_recipe[child.tag] = child.text or ""
-
-            saved_recipe["filename"] = recipes_file.name
-            xml_recipes.append(saved_recipe)
 
     context = {
         "form": RecipeForm(),
         "recipe": None,
         "xml_filename": None,
-        "xml_recipes": xml_recipes,
+        "xml_recipes": None,
         "upload_form": upload_form,
+        "source_form":source_form,
     }
     return render(request, "main/index.html", context)
