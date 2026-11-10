@@ -222,6 +222,7 @@ def recipe_search(request):
     )
 
     return JsonResponse(list(recipes), safe=False)
+    
 
 def recipe_create(request):
     upload_form = XmlUploadForm()
